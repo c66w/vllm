@@ -28,9 +28,13 @@ PACKED_MODULES_CFG = {
         "k_proj",
         "v_proj",
     ],
+    # "gate_up_proj": [
+    #     "gate_proj",
+    #     "up_proj",
+    # ],
     "gate_up_proj": [
-        "gate_proj",
-        "up_proj",
+        "w2",
+        "w1",
     ],
 }
 
@@ -41,6 +45,7 @@ TARGET_MODULES_QKV = [
     "down_proj",
     "embed_tokens",
     "lm_head",
+    "c_proj",
 ]
 
 EMBEDDING_MODULES = {
@@ -326,7 +331,7 @@ class LoRAModelManager:
         self.lora_target_modules = copy.deepcopy(lora_target_modules)
         self.packed_modules_mapping = copy.deepcopy(packed_modules_mapping)
         self.packed_modules: Dict[str, List[str]] = {}
-        self.modules: Dict[str, "BaseLayerWithLoRA"] = {}
+        self.modules: Dict[str, "torch.nn.Module"] = {}
         self._registered_loras: Dict[int, LoRAModel] = {}
         # Dict instead of a Set for compatibility with LRUCache.
         self._active_loras: Dict[int, None] = {}
@@ -446,11 +451,16 @@ class LoRAModelManager:
         for module_name, module in self.model.named_modules():
             if not self._match_target_modules(module_name):
                 continue
+            if module_name.endswith('attn.c_proj'):
+                continue
 
+            new_module = from_layer(module, self.lora_slots, self.lora_config,
+                           self.model.config)
+            if new_module is None:
+                continue
             new_module = replace_submodule(
                 self.model, module_name,
-                from_layer(module, self.lora_slots, self.lora_config,
-                           self.model.config))
+                new_module)
             # (yard1): TODO make this more robust
             if "lm_head" in module_name:
                 sampler_module = self.model.get_submodule("sampler")
@@ -465,7 +475,7 @@ class LoRAModelManager:
                                    self.embeddings_indices, self.indices_len)
 
     def register_module(self, module_name: str, module: "BaseLayerWithLoRA"):
-        assert isinstance(module, BaseLayerWithLoRA)
+        assert isinstance(module, torch.nn.Module)
         self.modules[module_name] = module
 
     def create_dummy_lora(self, lora_id: int, rank: int) -> LoRAModel:

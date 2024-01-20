@@ -944,9 +944,9 @@ def from_layer(
         lora_config: LoRAConfig,
         model_config: Optional[PretrainedConfig] = None) -> BaseLayerWithLoRA:
     supported_layer_types = {
-        VocabParallelEmbedding: VocabParallelEmbeddingWithLoRA,
+        # VocabParallelEmbedding: VocabParallelEmbeddingWithLoRA,
         ColumnParallelLinear: ColumnParallelLinearWithLoRA,
-        QKVParallelLinear: QKVParallelLinearWithLora,
+        # QKVParallelLinear: QKVParallelLinearWithLora,
         MergedColumnParallelLinear: MergedColumnParallelLinearWithLoRA,
         RowParallelLinear: RowParallelLinearWithLoRA,
     }
@@ -955,7 +955,7 @@ def from_layer(
             ret = lora_layer_type(layer)
             ret.create_lora_weights(max_loras, lora_config, model_config)
             return ret
-    return layer
+    return None
 
 
 def from_layer_sampler(
